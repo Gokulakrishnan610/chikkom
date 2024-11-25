@@ -9,8 +9,8 @@ import requests
 app = Flask(__name__)
 
 # URLs for the ESP32-CAM modules
-ESP32_CAM_1_URL = "http://192.168.222.43/cam-hi.jpg"
-ESP32_CAM_2_URL = "http://192.168.222.43/cam-hi.jpg"
+ESP32_CAM_1_URL = "http://192.168.222.43/cam-hi.jpg"  # ESP32-CAM 1
+ESP32_CAM_2_URL = "http://192.168.222.43/cam-mid.jpg"  # ESP32-CAM 2
 
 def fetch_frame(cam_url):
     """Fetch a single frame from the ESP32-CAM."""
@@ -24,18 +24,19 @@ def fetch_frame(cam_url):
         print(f"Error fetching frame: {e}")
         return None
 
-def send_frames(cam_url, client_ip, duration=120, interval=5):
-    """Send frames to the requesting client for the specified duration."""
+def send_frames(cam_url, cam_name, client_ip, duration=120, interval=1):
+    """Send frames to the receiver."""
     end_time = time.time() + duration
     while time.time() < end_time:
         frame = fetch_frame(cam_url)
         if frame:
             try:
                 response = requests.post(
-                    f"http://{client_ip}:7770/receive",  # Adjust port to receiver's
+                    f"http://{client_ip}:7770/receive",
+                    data={"cam": cam_name},  # Include the camera identifier
                     files={"image": ("frame.jpg", frame, "image/jpeg")}
                 )
-                print(f"Sent frame to {client_ip}: {response.status_code}")
+                print(f"Sent frame from {cam_name} to {client_ip}: {response.status_code}")
             except Exception as e:
                 print(f"Error sending frame: {e}")
         time.sleep(interval)
@@ -44,15 +45,15 @@ def send_frames(cam_url, client_ip, duration=120, interval=5):
 def handle_a1():
     """Handle requests for ESP32-CAM 1."""
     client_ip = request.remote_addr
-    threading.Thread(target=send_frames, args=(ESP32_CAM_1_URL, client_ip)).start()
-    return jsonify({"message": "Streaming frames from ESP32-CAM 1 to client", "client_ip": client_ip})
+    threading.Thread(target=send_frames, args=(ESP32_CAM_1_URL, "a1", client_ip)).start()
+    return jsonify({"message": "Streaming frames from ESP32-CAM 1", "client_ip": client_ip})
 
 @app.route('/a2', methods=['GET'])
 def handle_a2():
     """Handle requests for ESP32-CAM 2."""
     client_ip = request.remote_addr
-    threading.Thread(target=send_frames, args=(ESP32_CAM_2_URL, client_ip)).start()
-    return jsonify({"message": "Streaming frames from ESP32-CAM 2 to client", "client_ip": client_ip})
+    threading.Thread(target=send_frames, args=(ESP32_CAM_2_URL, "a2", client_ip)).start()
+    return jsonify({"message": "Streaming frames from ESP32-CAM 2", "client_ip": client_ip})
 
 @app.route('/')
 def home():
